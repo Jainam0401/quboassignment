@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     if (queryType === "image") {
       console.log(`Generating embedding for image query: ${input}`);
       const result = (await replicate.run(CLIP_MODEL, {
-        input: { image: input },
+        input: { input: input },
       })) as [{ embedding: number[]; input: string }];
       
       // Extract the embedding array from the result
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
         console.log("Generating new embedding for text query...");
         // Generate new embedding
         const result = (await replicate.run(CLIP_MODEL, {
-          input: { text: input },
+          input: { inputs: input },
         })) as [{ embedding: number[]; input: string }];
         
         // Extract the actual embedding array
@@ -115,33 +115,30 @@ export async function POST(req: NextRequest) {
 
     console.log("Embedding ready - length:", embedding.length);
 
-    // Perform vector similarity search using cosine distance
-    // NOTE: matchThreshold is now a similarity score (0.0 to 1.0)
-    const matchThreshold = 0.8; // Changed from 0.9 to 0.8 for a wider range of results
-    const matchCount = 10;
-    const embeddingStr = `[${embedding.join(',')}]`;
+  const matchThreshold = 0.1; // Increased threshold for better results
+  const matchCount = 10;
+  const embeddingStr = `[${embedding.join(',')}]`;
 
-    const results = await prisma.$queryRawUnsafe<SearchResult[]>(
-      `SELECT 
-          id::text,
-          url,
-          tags,
-          image_hash,
-          extracted_text,
-          created_at,
-          -- CORRECTED LINE: Calculate similarity (1 - distance) and round to 4 decimal places
-          ROUND((1 - (embedding <=> $1::vector))::numeric, 4) as similarity
-        FROM images
-        WHERE embedding IS NOT NULL
-          -- Filter where similarity is greater than the threshold (e.g., 0.8)
-          AND 1 - (embedding <=> $1::vector) > $2
-        -- Order by distance (smaller distance first = better match)
-        ORDER BY embedding <=> $1::vector
-        LIMIT $3`,
-      embeddingStr,
-      matchThreshold,
-      matchCount
-    );
+const results = await prisma.$queryRawUnsafe<SearchResult[]>(
+  `SELECT 
+     id::text,
+     url,
+     tags,
+     image_hash,
+     extracted_text,
+     created_at,
+     (embedding <=> $1::vector) AS cos_distance,
+     ROUND((1 - (embedding <=> $1::vector))::numeric, 4) AS similarity
+   FROM images
+   WHERE embedding IS NOT NULL
+     -- convert similarity threshold to distance threshold:
+     AND (embedding <=> $1::vector) < (1 - $2)
+   ORDER BY embedding <=> $1::vector ASC
+   LIMIT $3`,
+  embeddingStr,       // e.g. "[0.12,0.34,...]" cast to vector server-side
+  matchThreshold,     // e.g. 0.5 where 1.0 = identical, 0.0 = orthogonal
+  matchCount
+);
 
     console.log(results,"results")
 
@@ -154,8 +151,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("Search Error:", err);
+    // Ensure that only the message is returned in the response
+    const errorMessage = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { success: false, error: err },
+      { success: false, error: errorMessage },
       { status: 500 }
     );
   }

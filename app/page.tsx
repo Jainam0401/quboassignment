@@ -197,11 +197,11 @@ export default function HomePage() {
             </div>
 
             <div className="relative flex items-center justify-center my-4">
-              <div className="flex-grow border-t border-gray-300"></div>
-              <span className="flex-shrink mx-4 text-gray-500 text-sm">
+              <div className="grow border-t border-gray-300"></div>
+              <span className="shrink mx-4 text-gray-500 text-sm">
                 OR
               </span>
-              <div className="flex-grow border-t border-gray-300"></div>
+              <div className="grow border-t border-gray-300"></div>
             </div>
 
             {/* Search by Image URL */}
