@@ -66,7 +66,9 @@ export async function POST(req: NextRequest) {
         console.log("✅ Using cached text embedding");
         // Parse the PostgreSQL vector format "[0.1,0.2,...]" to array
         const embeddingStr = cachedQuery[0].embedding;
-        embedding = JSON.parse(embeddingStr.replace(/[\s+\[\]]/g, '').split(',').filter(Boolean).map(Number));
+        // Remove surrounding brackets, split by comma, trim each entry and convert to numbers
+        const cleaned = embeddingStr.replace(/^\s*\[|\]\s*$/g, '');
+        embedding = cleaned.length > 0 ? cleaned.split(',').map(s => Number(s.trim())) : [];
       } else {
         console.log("Generating new embedding for text query...");
         // Generate new embedding
@@ -153,7 +155,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Search Error:", err);
     return NextResponse.json(
-      { success: false, error: err.message },
+      { success: false, error: err },
       { status: 500 }
     );
   }

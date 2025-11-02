@@ -74,7 +74,8 @@ export async function POST(req: NextRequest) {
 
       extractedText = typeof ocrResult === 'string' ? ocrResult : ocrResult?.text || JSON.stringify(ocrResult);
     } catch (ocrError) {
-      console.warn("OCR failed, continuing without text extraction:", ocrError.message);
+      const errMsg = ocrError instanceof Error ? ocrError.message : String(ocrError);
+      console.warn("OCR failed, continuing without text extraction:", errMsg);
     }
 
     // 4️⃣ Extract the actual embedding vector (CRITICAL FIX)
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
       console.log("✅ Database insert successful");
     } catch (dbError) {
       console.error("Database insertion error:", dbError);
-      throw new Error(`Database error: ${dbError.message}`);
+      throw new Error(`Database error: ${dbError}`);
     }
 
     console.log("✅ Successfully uploaded and processed new image.");
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Upload Error:", err);
     return NextResponse.json(
-      { success: false, error: err.message },
+      { success: false, error: err },
       { status: 500 }
     );
   }
