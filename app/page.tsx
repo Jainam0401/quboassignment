@@ -1,8 +1,20 @@
-"use client"
+"use client";
 import { useState } from "react";
 
-// A simple component to show status messages
-function StatusMessage({ message }) {
+// ---------------- Types ----------------
+interface SearchResult {
+  id: string;
+  url: string;
+  similarity: number;
+  tags?: string[];
+}
+
+interface StatusMessageProps {
+  message: string;
+}
+
+// ---------------- Components ----------------
+function StatusMessage({ message }: StatusMessageProps) {
   if (!message) return null;
   const isError = message.startsWith("❌");
   return (
@@ -19,16 +31,18 @@ function StatusMessage({ message }) {
 }
 
 export default function HomePage() {
-  const [imageUrl, setImageUrl] = useState("");
-  const [tags, setTags] = useState("");
-  const [searchText, setSearchText] = useState("");
-  const [results, setResults] = useState([]);
-  const [uploading, setUploading] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [tags, setTags] = useState<string>("");
+  const [searchText, setSearchText] = useState<string>("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [searching, setSearching] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<string>("");
 
-  // Handler for uploading/indexing an image
-  async function handleUpload() {
+  // ---------------- Handlers ----------------
+
+  // Upload and index an image
+  async function handleUpload(): Promise<void> {
     if (!imageUrl) {
       setStatusMessage("❌ Please enter an image URL to upload.");
       return;
@@ -41,26 +55,46 @@ export default function HomePage() {
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl, tags: tags.split(",").filter(t => t.trim() !== "") }),
+        body: JSON.stringify({
+          imageUrl,
+          tags: tags.split(",").filter((t) => t.trim() !== ""),
+        }),
       });
-      const data = await res.json();
+
+      const data: {
+        success: boolean;
+        cached?: boolean;
+        error?: string;
+      } = await res.json();
 
       if (data.success) {
-        setStatusMessage(data.cached ? "✅ Image was already in database." : "✅ Image uploaded and processed!");
+        setStatusMessage(
+          data.cached
+            ? "✅ Image was already in database."
+            : "✅ Image uploaded and processed!"
+        );
       } else {
         setStatusMessage(`❌ Upload failed: ${data.error}`);
       }
     } catch (err) {
       console.error(err);
       setStatusMessage("❌ An unexpected error occurred during upload.");
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   }
 
   // Generic search handler
-  async function handleSearch(queryType, input) {
+  async function handleSearch(
+    queryType: "text" | "image",
+    input: string
+  ): Promise<void> {
     if (!input) {
-      setStatusMessage(`❌ Please enter ${queryType === 'image' ? 'an image URL' : 'search text'}.`);
+      setStatusMessage(
+        `❌ Please enter ${
+          queryType === "image" ? "an image URL" : "search text"
+        }.`
+      );
       return;
     }
     setSearching(true);
@@ -71,24 +105,36 @@ export default function HomePage() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Fix: Send the correct payload
         body: JSON.stringify({ queryType, input }),
       });
-      const data = await res.json();
+
+      const data: {
+        success: boolean;
+        results?: SearchResult[];
+        error?: string;
+      } = await res.json();
 
       if (data.success && data.results) {
         setResults(data.results);
-        setStatusMessage(data.results.length > 0 ? `Found ${data.results.length} results.` : "No similar images found.");
+        setStatusMessage(
+          data.results.length > 0
+            ? `Found ${data.results.length} results.`
+            : "No similar images found."
+        );
       } else {
-        setStatusMessage(`❌ Search failed: ${data.error || 'Unknown error'}`);
+        setStatusMessage(
+          `❌ Search failed: ${data.error || "Unknown error"}`
+        );
       }
     } catch (err) {
       console.error(err);
       setStatusMessage("❌ An unexpected error occurred during search.");
+    } finally {
+      setSearching(false);
     }
-    setSearching(false);
   }
 
+  // ---------------- JSX ----------------
   return (
     <div className="min-h-screen p-4 md:p-8 bg-gray-50 text-gray-900 font-sans">
       <div className="max-w-4xl mx-auto">
@@ -98,7 +144,9 @@ export default function HomePage() {
 
         {/* --- UPLOAD SECTION --- */}
         <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4">1. Add Image to Database</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            1. Add Image to Database
+          </h2>
           <div className="space-y-4">
             <input
               type="text"
@@ -126,7 +174,9 @@ export default function HomePage() {
 
         {/* --- SEARCH SECTION --- */}
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">2. Find Similar Images</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            2. Find Similar Images
+          </h2>
           <div className="space-y-4">
             {/* Search by Text */}
             <div className="flex gap-2">
@@ -145,15 +195,19 @@ export default function HomePage() {
                 Search
               </button>
             </div>
-            
+
             <div className="relative flex items-center justify-center my-4">
-                <div className="flex-grow border-t border-gray-300"></div>
-                <span className="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
-                <div className="flex-grow border-t border-gray-300"></div>
+              <div className="flex-grow border-t border-gray-300"></div>
+              <span className="flex-shrink mx-4 text-gray-500 text-sm">
+                OR
+              </span>
+              <div className="flex-grow border-t border-gray-300"></div>
             </div>
 
             {/* Search by Image URL */}
-            <p className="text-sm text-gray-600">Search using the Image URL from Step 1 (or any other URL):</p>
+            <p className="text-sm text-gray-600">
+              Search using the Image URL from Step 1 (or any other URL):
+            </p>
             <button
               onClick={() => handleSearch("image", imageUrl)}
               disabled={uploading || searching || !imageUrl}
@@ -163,7 +217,7 @@ export default function HomePage() {
             </button>
           </div>
         </div>
-        
+
         {/* --- STATUS & RESULTS --- */}
         <StatusMessage message={statusMessage} />
 
@@ -180,15 +234,21 @@ export default function HomePage() {
                     src={r.url}
                     alt="search result"
                     className="w-full h-40 object-cover rounded mb-2"
-                    onError={(e) => (e.currentTarget.src = 'https://placehold.co/400x400/eee/ccc?text=Image+Failed')}
+                    onError={(e) =>
+                      (e.currentTarget.src =
+                        "https://placehold.co/400x400/eee/ccc?text=Image+Failed")
+                    }
                   />
                   <p className="text-sm text-gray-700 font-medium text-center">
                     Similarity: {(r.similarity * 100).toFixed(1)}%
                   </p>
                   {r.tags && r.tags.length > 0 && (
-                     <p className="text-xs text-gray-500 truncate" title={r.tags.join(', ')}>
-                        Tags: {r.tags.join(', ')}
-                     </p>
+                    <p
+                      className="text-xs text-gray-500 truncate"
+                      title={r.tags.join(", ")}
+                    >
+                      Tags: {r.tags.join(", ")}
+                    </p>
                   )}
                 </div>
               ))}

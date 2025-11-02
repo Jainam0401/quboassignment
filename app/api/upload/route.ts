@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
     const embeddingResult = (await replicate.run(CLIP_MODEL, { // ⬅️ USED CLIP_MODEL
       input: {
         image: imageUrl,
+        
       },
     })) as [{ embedding: number[]; input: string }];
 
