@@ -56,9 +56,9 @@ export async function POST(req: NextRequest) {
       // This avoids the Prisma client error on "Unsupported" type
       const cachedQuery = await prisma.$queryRawUnsafe<CachedEmbedding[]>(
         `SELECT embedding::text as embedding 
-         FROM text_queries 
-         WHERE query = $1 
-         LIMIT 1`,
+          FROM text_queries 
+          WHERE query = $1 
+          LIMIT 1`,
         input
       );
 
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         console.log("✅ Using cached text embedding");
         // Parse the PostgreSQL vector format "[0.1,0.2,...]" to array
         const embeddingStr = cachedQuery[0].embedding;
-        embedding = JSON.parse(embeddingStr.replace(/\s+/g, ''));
+        embedding = JSON.parse(embeddingStr.replace(/[\s+\[\]]/g, '').split(',').filter(Boolean).map(Number));
       } else {
         console.log("Generating new embedding for text query...");
         // Generate new embedding
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
           );
           console.log("✅ Cached text embedding for future use");
         } catch (cacheError) {
-          console.warn("Failed to cache text embedding:", cacheError.message);
+          console.warn("Failed to cache text embedding:", cacheError);
         }
       }
     } else {
@@ -101,9 +101,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify embedding is a flat array of numbers
-    if (!Array.isArray(embedding) || typeof embedding[0] !== 'number') {
+    if (!Array.isArray(embedding) || typeof embedding[0] !== 'number' || embedding.some(isNaN)) {
       console.error("Invalid embedding format:", embedding);
-      throw new Error("Embedding must be an array of numbers");
+      throw new Error("Embedding must be a valid array of numbers");
     }
 
     // Validate embedding dimensions
@@ -114,28 +114,34 @@ export async function POST(req: NextRequest) {
     console.log("Embedding ready - length:", embedding.length);
 
     // Perform vector similarity search using cosine distance
-    const matchThreshold = 0.1;
+    // NOTE: matchThreshold is now a similarity score (0.0 to 1.0)
+    const matchThreshold = 0.8; // Changed from 0.9 to 0.8 for a wider range of results
     const matchCount = 10;
     const embeddingStr = `[${embedding.join(',')}]`;
 
     const results = await prisma.$queryRawUnsafe<SearchResult[]>(
       `SELECT 
-         id::text,
-         url,
-         tags,
-         image_hash,
-         extracted_text,
-         created_at,
-         1 - (embedding <=> $1::vector) as similarity
-       FROM images
-       WHERE embedding IS NOT NULL
-         AND 1 - (embedding <=> $1::vector) > $2
-       ORDER BY embedding <=> $1::vector
-       LIMIT $3`,
+          id::text,
+          url,
+          tags,
+          image_hash,
+          extracted_text,
+          created_at,
+          -- CORRECTED LINE: Calculate similarity (1 - distance) and round to 4 decimal places
+          ROUND((1 - (embedding <=> $1::vector))::numeric, 4) as similarity
+        FROM images
+        WHERE embedding IS NOT NULL
+          -- Filter where similarity is greater than the threshold (e.g., 0.8)
+          AND 1 - (embedding <=> $1::vector) > $2
+        -- Order by distance (smaller distance first = better match)
+        ORDER BY embedding <=> $1::vector
+        LIMIT $3`,
       embeddingStr,
       matchThreshold,
       matchCount
     );
+
+    console.log(results,"results")
 
     console.log(`Found ${results.length} matches.`);
     return NextResponse.json({ 

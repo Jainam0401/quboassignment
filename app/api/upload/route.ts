@@ -9,8 +9,8 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
-const clip = "andreasjansson/clip-features:75b33f253f7714a281ad3e9b28f63e3232d583716ef6718f2e46641077ea040a";
-const ocr = "abiruyt/text-extract-ocr:a524caeaa23495bc9edc805ab08ab5fe943afd3febed884a4f3747aa32e9cd61";
+const CLIP_MODEL = "andreasjansson/clip-features:75b33f253f7714a281ad3e9b28f63e3232d583716ef6718f2e46641077ea040a";
+const OCR_MODEL = "abiruyt/text-extract-ocr:a524caeaa23495bc9edc805ab08ab5fe943afd3febed884a4f3747aa32e9cd61";
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,19 +52,21 @@ export async function POST(req: NextRequest) {
     }
 
     // 2️⃣ Generate image embedding
-    console.log(`Generating embedding for ${imageUrl}...`);
+    console.log(`Generating embedding for ${imageUrl} using ${CLIP_MODEL}...`);
     // This model returns: [{ embedding: [0.1, 0.2, ...], input: '...' }]
-    const embeddingResult = (await replicate.run(clip, {
+    const embeddingResult = (await replicate.run(CLIP_MODEL, { // ⬅️ USED CLIP_MODEL
       input: {
         image: imageUrl,
       },
     })) as [{ embedding: number[]; input: string }];
 
+    console.log("embedding",embeddingResult)
+
     // 3️⃣ Run OCR extraction
     let extractedText = "";
     try {
-      console.log(`Running OCR for ${imageUrl}...`);
-      const ocrResult = (await replicate.run(ocr, {
+      console.log(`Running OCR for ${imageUrl} using ${OCR_MODEL}...`);
+      const ocrResult = (await replicate.run(OCR_MODEL, { // ⬅️ USED OCR_MODEL
         input: {
           image: imageUrl,
         },
@@ -80,6 +82,8 @@ export async function POST(req: NextRequest) {
     if (Array.isArray(embeddingResult) && embeddingResult[0]?.embedding) {
       vector = embeddingResult[0].embedding;
     } else {
+      // Log the unexpected result to debug
+      console.error("Replicate result structure:", JSON.stringify(embeddingResult)); 
       throw new Error("Unexpected embedding format from Replicate");
     }
 
