@@ -9,8 +9,8 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
-const CLIP_MODEL = "andreasjansson/clip-features:75b33f253f7714a281ad3e9b28f63e3232d583716ef6718f2e46641077ea040a";
-const OCR_MODEL = "abiruyt/text-extract-ocr:a524caeaa23495bc9edc805ab08ab5fe943afd3febed884a4f3747aa32e9cd61";
+const clip = "andreasjansson/clip-features:75b33f253f7714a281ad3e9b28f63e3232d583716ef6718f2e46641077ea040a";
+const ocr = "abiruyt/text-extract-ocr:a524caeaa23495bc9edc805ab08ab5fe943afd3febed884a4f3747aa32e9cd61";
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     // 2️⃣ Generate image embedding
     console.log(`Generating embedding for ${imageUrl}...`);
     // This model returns: [{ embedding: [0.1, 0.2, ...], input: '...' }]
-    const embeddingResult = (await replicate.run(CLIP_MODEL, {
+    const embeddingResult = (await replicate.run(clip, {
       input: {
         image: imageUrl,
       },
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     let extractedText = "";
     try {
       console.log(`Running OCR for ${imageUrl}...`);
-      const ocrResult = (await replicate.run(OCR_MODEL, {
+      const ocrResult = (await replicate.run(ocr, {
         input: {
           image: imageUrl,
         },
