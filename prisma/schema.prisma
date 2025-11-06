@@ -10,22 +10,41 @@ datasource db {
   extensions = [vector]
 }
 
+model Users {
+  id          Int            @id @default(autoincrement())
+  userId      String         @unique @map("user_id")
+  email       String         @unique
+  password    String
+  created_at  DateTime       @default(now()) @db.Timestamp(6)
+  salt        String
+  firstName   String         @map("first_name")
+  lastName    String         @map("last_name")
+  profilePic  String?        @map("profile_pic")
+  images      images[]
+  textQueries text_queries[]
+
+  @@map("users")
+}
+
 model images {
- id Int @id @default(autoincrement())
+  id             Int                         @id @default(autoincrement())
   url            String
   embedding      Unsupported("vector(768)")?
   tags           String[]
   image_hash     String?                     @unique
   extracted_text String?
   created_at     DateTime?                   @default(now()) @db.Timestamp(6)
-
+  uploadedById   Int
+  uploadedBy     Users                       @relation(fields: [uploadedById], references: [id])
 
   @@index([image_hash])
 }
 
 model text_queries {
-  id Int @id @default(autoincrement())
-  query      String?   @unique
+  id         Int                         @id @default(autoincrement())
+  query      String?                     @unique
   embedding  Unsupported("vector(768)")?
-  created_at DateTime? @default(now()) @db.Timestamp(6)
+  created_at DateTime?                   @default(now()) @db.Timestamp(6)
+  userId     Int
+  user       Users                       @relation(fields: [userId], references: [id])
 }
